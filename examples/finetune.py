@@ -1,3 +1,11 @@
+#%%
+# ref: https://github.com/kuleshov-group/llmtools/issues/34
+import sys
+sys.path.extend(['/home/imsrgadich/gitrepos/llmtools',
+                 '/home/imsrgadich/miniconda3/envs/llm-tools/lib/python3.11/site-packages/'
+                 'quant_cuda-0.0.0-py3.11-linux-x86_64.egg/llmtune/engine/quant'])
+
+#%%
 import os
 import torch
 import transformers
@@ -8,12 +16,14 @@ from llmtools.data import TrainSAD
 from llmtools.engine.lora.peft import quant_peft
 from llmtools.utils import to_half_precision
 
+#%%
 # model config
 model_name = 'kuleshov/llama-7b-4bit'
 # model_name = './llama-7b-quantized' # can generate local dir via quantize.py
 tokenizer_name = 'huggyllama/llama-13b'
 DEV = 'cuda'
 
+#%%
 # load model
 transformers.logging.set_verbosity_info()
 llm = AutoLLMForCausalLM.from_pretrained(model_name)
@@ -21,10 +31,12 @@ llm.eval()
 llm = llm.to(DEV)
 llm = to_half_precision(llm)
 
+#%%
 # load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 tokenizer.pad_token_id = 0
 
+#%%
 # finetune training config
 mbatch_size=1
 batch_size=2
@@ -44,6 +56,7 @@ data_type = 'alpaca'
 dataset = None # will load alpaca from HF
 adapter_path = './llama-7b-quantized-lora'
 
+#%%
 # set up finetuning config
 tune_config = FinetuneConfig(
     dataset=dataset, 
@@ -64,6 +77,7 @@ tune_config = FinetuneConfig(
     logging_steps=logging_steps,
 )
 
+#%%
 # set up lora config    
 lora_config = quant_peft.LoraConfig(
     r=tune_config.lora_r,
@@ -74,18 +88,21 @@ lora_config = quant_peft.LoraConfig(
     task_type="CAUSAL_LM",
 )
 
+#%%
 # create a new lora from config
 model = quant_peft.get_peft_model(llm, lora_config)
 
+#%%
 # load stanford alpaca data
 data = TrainSAD(
-    tune_config.dataset, 
-    tune_config.val_set_size, 
-    tokenizer, 
-    tune_config.cutoff_len
+    dataset=tune_config.dataset,
+    val_set_size=tune_config.val_set_size,
+    tokenizer=tokenizer,
+    cutoff_len=tune_config.cutoff_len
 )
 data.prepare_data() # this tokenizes the dataset
 
+#%%
 # training args
 training_arguments = transformers.TrainingArguments(
     per_device_train_batch_size=tune_config.mbatch_size,
@@ -105,6 +122,7 @@ training_arguments = transformers.TrainingArguments(
     ddp_find_unused_parameters=False if tune_config.ddp else None,
 )
 
+#%%
 # start trainer
 trainer = transformers.Trainer(
     model=model,
@@ -118,9 +136,11 @@ trainer = transformers.Trainer(
 print(training_arguments.parallel_mode)
 model.config.use_cache = False
 
+#%%
 # use half precision
 model = to_half_precision(model)
 
+#%%
 # start training
 checkpoint_dir = tune_config.lora_out_dir
 if os.path.exists(checkpoint_dir) and os.listdir(checkpoint_dir):
@@ -128,6 +148,7 @@ if os.path.exists(checkpoint_dir) and os.listdir(checkpoint_dir):
 else:
     trainer.train()
 
+#%%
 # Save Model
 model.save_pretrained(tune_config.lora_out_dir)
 

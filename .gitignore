@@ -4,3 +4,4 @@ __pycache__
 sftp-config.json
 tidbits
 llmtools/llms/alpaca
+.idea

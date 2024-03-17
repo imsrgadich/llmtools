@@ -3,7 +3,7 @@ import os
 class FinetuneConfig:
     """Config holder for finetuning"""
     def __init__(
-        self, dataset: str, ds_type: str, 
+        self, dataset: str or None, ds_type: str,
         lora_out_dir: str,
         mbatch_size: int, batch_size: int,
         epochs: int, lr: float, 
